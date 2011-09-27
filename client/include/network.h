@@ -1,6 +1,14 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
+#include <nds.h>
+#include <dswifi9.h>
+#include <netinet/in.h>
+
+#define PORTNUM 9393
+
+typedef int SOCKET;
+
 typedef enum
 {
   Message_Syn,            //ds <-> pc
@@ -19,11 +27,11 @@ typedef struct
   union
   {
     struct {
-      int magic;
+      u32 magic;
     } syn;
 
     struct {
-      int magic;
+      u32 magic;
     } ack;
 
     struct {
@@ -51,6 +59,28 @@ typedef struct
     char payload[0];
   };
 } Message;
+
+class NetManager {
+private:
+  SOCKET             listener;
+  SOCKET             connection;
+  struct in_addr     ip;
+  struct sockaddr_in addr;
+  int                addr_len;
+  Message            msg;
+
+  bool connectWifi();
+  bool initSockets();
+  bool handshake();
+  void shutdown();
+
+public:
+  NetManager();
+  ~NetManager();
+
+  bool connect();
+  void printIP();
+};
 
 #endif /* NETWORK_H */
 
