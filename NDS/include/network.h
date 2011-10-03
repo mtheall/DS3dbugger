@@ -5,7 +5,8 @@
 #include <dswifi9.h>
 #include <netinet/in.h>
 
-#define PORTNUM 9393
+#define PORTNUM      9393
+#define DISPLISTSIZE 1048576
 
 typedef int SOCKET;
 
@@ -18,7 +19,6 @@ typedef enum
   Message_Register32,     //pc --> ds
   Message_DisplayList,    //pc --> ds
   Message_DisplayCapture, //ds --> pc
-  Message_Payload,        //ds <-> pc
 } MessageType;
 
 typedef struct
@@ -55,8 +55,6 @@ typedef struct
 
     struct {
     } dispcap;
-
-    char payload[0];
   };
 } Message;
 
@@ -69,8 +67,8 @@ private:
   int                addr_len;
   Message            msg;
 
-  bool connectWifi();
-  bool initSockets();
+  void connectWifi();
+  void initSockets();
   bool handshake();
   void shutdown();
 
@@ -78,8 +76,8 @@ public:
   NetManager();
   ~NetManager();
 
-  bool connect();
-  void printIP();
+  void connect();
+  void update();
 };
 
 #endif /* NETWORK_H */
