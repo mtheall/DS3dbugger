@@ -354,7 +354,7 @@ void handleDisplayList(SOCKET connection, Message &msg) {
   do {
     rc = recvall(connection, (char*)dispList, msg.displist.size, 0);
   } while(rc == -1);
-  iprintf("recv %d bytes\n", rc);
+  iprintf("Received %d bytes\n", rc);
 
   DC_FlushRange(dispList, msg.displist.size);
 
