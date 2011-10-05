@@ -46,7 +46,7 @@ namespace DS3dbugger
 		public uint register32_value;
 
 		[FieldOffset(4)]
-		public uint displist_size;
+		public int displist_size;
 
 		public void Send(Stream s)
 		{
