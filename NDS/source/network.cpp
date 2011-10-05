@@ -159,6 +159,8 @@ bool NetManager::handshake() {
   closesocket(listener);
   listener = -1;
 
+  iprintf("Accepted connection from %s\n", inet_ntoa(addr.sin_addr.s_addr));
+
   return true;
 }
 
@@ -186,6 +188,7 @@ void NetManager::connect() {
   }
 
   /* send Sync message */
+  iprintf("Sending Syn message\n");
   memset(&msg, 0, sizeof(msg));
   msg.type      = Message_Syn;
   msg.syn.magic = 0xDEADBEEF;
@@ -197,8 +200,10 @@ void NetManager::connect() {
     else
       quit("Only sent %d/%d bytes\n", rc, sizeof(msg));
   }
+  iprintf("Sent %d bytes\n", sizeof(msg));
 
   /* receive Acknowledge message */
+  iprintf("Listening for Ack message\n");
   memset(&msg, 0, sizeof(msg));
   rc = recv(connection, &msg, sizeof(msg), MSG_WAITALL);
   if(rc != sizeof(msg)) {
@@ -207,6 +212,7 @@ void NetManager::connect() {
     else
       quit("Only recv %d/%d bytes\n", rc, sizeof(msg));
   }
+  printf("Received %d bytes\n", sizeof(msg));
 
   handleAck(connection, msg);
 }
