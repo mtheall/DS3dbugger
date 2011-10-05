@@ -204,13 +204,17 @@ void NetManager::connect() {
   /* receive Acknowledge message */
   iprintf("Listening for Ack message\n");
   memset(&msg, 0, sizeof(msg));
-  rc = recv(connection, &msg, sizeof(msg), MSG_WAITALL);
-  if(rc != sizeof(msg)) {
-    if(rc == -1)
-      quit("recv: %s\n", strerror(errno));
-    else
-      quit("Only recv %d/%d bytes\n", rc, sizeof(msg));
-  }
+  do {
+    rc = recv(connection, &msg, sizeof(msg), 0);
+    if(rc != sizeof(msg)) {
+      if(rc == -1) {
+        if(errno != EWOULDBLOCK)
+          quit("recv: %s\n", strerror(errno));
+      }
+      else
+        quit("Only recv %d/%d bytes\n", rc, sizeof(msg));
+    }
+  } while(rc == -1);
   printf("Received %d bytes\n", sizeof(msg));
 
   handleAck(connection, msg);
@@ -241,9 +245,7 @@ void NetManager::update() {
   } while(rc == sizeof(msg));
 
   if(rc == -1) {
-    if(errno == EWOULDBLOCK)
-      return;
-    else
+    if(errno != EWOULDBLOCK)
       quit("recv: %s", strerror(errno));
   }
   else
@@ -295,7 +297,11 @@ void handleTexture(SOCKET connection, Message &msg) {
   if(buffer == NULL)
      quit("Failed to malloc buffer");
 
-  rc = recv(connection, buffer, msg.tex.size, MSG_WAITALL);
+  do {
+    rc = recv(connection, buffer, msg.tex.size, 0);
+    if(rc == -1 && errno != EWOULDBLOCK)
+      quit("recv: %s\n", strerror(errno));
+  } while (rc == -1);
 
   if(rc != msg.tex.size) {
     if(rc == -1)
@@ -348,14 +354,14 @@ void handleDisplayList(SOCKET connection, Message &msg) {
   }
   dispListSize = msg.displist.size;
 
-  rc = recv(connection, dispList, msg.displist.size, MSG_WAITALL);
-
-  if(rc != msg.displist.size) {
-    if(rc == -1)
+  do {
+    rc = recv(connection, dispList, msg.displist.size, 0);
+    if(rc == -1 && errno != EWOULDBLOCK)
       quit("recv: %s\n", strerror(errno));
-    else
-      quit("Only recv %d/%d bytes\n", rc, msg.displist.size);
-  }
+  } while(rc == -1);
+
+  if(rc != msg.displist.size)
+    quit("Only recv %d/%d bytes\n", rc, msg.displist.size);
 
   DC_FlushRange(dispList, msg.displist.size);
 
