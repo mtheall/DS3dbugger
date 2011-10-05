@@ -398,9 +398,12 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
 
   do {
     rc = send(connection, &cap[sent], (256*192*2)-sent, 0);
-    if(rc == -1 && errno != EWOULDBLOCK)
-      quit("send: %s\n", strerror(errno));
-    sent += rc;
+    if(rc == -1) {
+      if(errno != EWOULDBLOCK)
+        quit("send: %s\n", strerror(errno));
+    }
+    else
+      sent += rc;
   } while(sent < 256*192*2);
   iprintf("sent %d bytes\n", sent);
 }
