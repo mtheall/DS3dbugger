@@ -159,7 +159,7 @@ bool NetManager::handshake() {
   closesocket(listener);
   listener = -1;
 
-  iprintf("Accepted connection from %s\n", inet_ntoa(addr.sin_addr.s_addr));
+  iprintf("Accepted connection from %s\n", inet_ntoa(addr.sin_addr));
 
   return true;
 }
