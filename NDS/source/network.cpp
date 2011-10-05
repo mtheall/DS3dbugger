@@ -12,6 +12,8 @@ static const int on              = 1;
 static void     *dispList        = NULL;
 static int       dispListSize    = 0;
 static int       dispListMaxSize = 0;
+static char      cap[256*192*2];
+static char      vram_temp[128*1024];
 
 /* Message handlers */
 void handleSyn(SOCKET connection, Message &msg);
@@ -63,7 +65,7 @@ static inline void quit(const char *format, ...) {
 
 static inline int recvall(int s, char *buf, size_t len, int flags) {
   int rc;
-  unsigned int recvd = 0;
+  size_t recvd = 0;
 
   do {
     rc = recv(s, &(buf[recvd]), len-recvd, flags);
@@ -359,9 +361,44 @@ void handleDisplayList(SOCKET connection, Message &msg) {
 }
 
 void handleDisplayCapture(SOCKET connection, Message &msg) {
+  int rc;
+  size_t sent = 0;
+
   if(msg.type != Message_DisplayCapture)
     quit("DisplayCapture: Message type mismatch");
 
   iprintf("Got DisplayCapture message\n");
+
+  /* change VRAM D to LCD mode */
+  u8 vram_cr_temp = VRAM_D_CR;
+  VRAM_D_CR = VRAM_D_LCD;
+
+  /* keep old copy of VRAM D */
+  dmaCopy(VRAM_D, vram_temp, 128*1024);
+  swiWaitForVBlank();
+
+  /* start capture */
+  REG_DISPCAPCNT = DCAP_ENABLE
+                 | DCAP_MODE(DCAP_MODE_A)
+                 | DCAP_SRC_A(DCAP_SRC_A_3DONLY)
+                 | DCAP_SIZE(DCAP_SIZE_256x192)
+  /*             | DCAP_BANK(DCAP_BANK_VRAM_D) wrong value? */
+                 | DCAP_BANK(3);
+  while(REG_DISPCAPCNT & DCAP_ENABLE);
+
+  /* copy capture into buffer */
+  dmaCopy(VRAM_D, cap, 256*192*2);
+  DC_InvalidateAll();
+
+  /* move old copy back into VRAM D */
+  dmaCopy(vram_temp, VRAM_D, 128*1024);
+
+  VRAM_D_CR = vram_cr_temp;
+
+  do {
+    rc = send(connection, &cap[sent], (256*192*2)-sent, 0);
+    if(rc == -1 && errno != EWOULDBLOCK)
+      quit("send: %s\n", strerror(errno));
+  } while(sent < 256*192*2);
 }
 
