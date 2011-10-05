@@ -10,6 +10,8 @@ int main(int argc, char *argv[]) {
   vramSetBankH(VRAM_H_SUB_BG);
   consoleInit(0, 0, BgType_Text4bpp, BgSize_T_256x256, 2, 0, false, true);
 
+	glInit();
+
   net.connect();
 
   do {
