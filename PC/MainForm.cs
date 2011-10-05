@@ -9,14 +9,17 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
+using System.Net;
+using System.Net.Sockets;
 
 namespace DS3dbugger
 {
 	public partial class MainForm : Form
 	{
-		class ConfigStruct
+		static void Main(string[] args)
 		{
-			public string host;
+			new DS3dbugger.MainForm().ShowDialog();
 		}
 
 		ConfigStruct Config = new ConfigStruct();
@@ -36,10 +39,29 @@ namespace DS3dbugger
 			ConfigService.Save(fnPrefs, Config);
 		}
 
+
+		TcpClient tcpc;
+		NetworkStream ns;
 		private void btnConnect_Click(object sender, EventArgs e)
 		{
+			tcpc = new TcpClient(txtHost.Text, 9393);
+			tcpc.NoDelay = true;
+			ns = tcpc.GetStream();
 
+			Message msg = new Message();
+			msg.Recv(ns);
+
+			msg.type = MessageType.Message_Ack;
+			msg.Send(ns);
+
+			btnConnect.Enabled = false;
+			btnConnect.Text = "connected";
 		}
+	}
+
+	class ConfigStruct
+	{
+		public string host;
 	}
 
 }

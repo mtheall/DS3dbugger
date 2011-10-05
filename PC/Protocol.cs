@@ -5,17 +5,17 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 
-class Protocol
+namespace DS3dbugger
 {
 	enum MessageType : uint
 	{
-	  Message_Syn,            //ds <-> pc
-	  Message_Ack,            //ds <-> pc
-	  Message_Texture,        //pc --> ds
-	  Message_Register16,     //pc --> ds
-	  Message_Register32,     //pc --> ds
-	  Message_DisplayList,    //pc --> ds
-	  Message_DisplayCapture, //ds --> pc
+		Message_Syn,            //ds <-> pc
+		Message_Ack,            //ds <-> pc
+		Message_Texture,        //pc --> ds
+		Message_Register16,     //pc --> ds
+		Message_Register32,     //pc --> ds
+		Message_DisplayList,    //pc --> ds
+		Message_DisplayCapture, //ds --> pc
 	} ;
 
 	[StructLayout(LayoutKind.Explicit)]
@@ -23,7 +23,7 @@ class Protocol
 	{
 		[FieldOffset(0)]
 		public MessageType type;
-  
+
 		[FieldOffset(4)]
 		public uint syn_magic;
 
@@ -71,25 +71,9 @@ class Protocol
 
 			IntPtr ptr = Marshal.AllocHGlobal(len);
 			Marshal.Copy(buf, 0, ptr, len);
-			this = (Message)Marshal.PtrToStructure(ptr,GetType());
+			this = (Message)Marshal.PtrToStructure(ptr, GetType());
 			Marshal.FreeHGlobal(ptr);
 		}
-	}
+		}
 
-	static void Main(string[] args)
-	{
-		new DS3dbugger.MainForm().ShowDialog();
-
-		var tcpc = new TcpClient("192.168.1.103", 9393);
-		tcpc.NoDelay = true;
-		var ns = tcpc.GetStream();
-
-		Message msg = new Message();
-		msg.Recv(ns);
-
-		msg.type = MessageType.Message_Ack;
-		msg.Send(ns);
-
-		Console.WriteLine("success");
-	}
 }
