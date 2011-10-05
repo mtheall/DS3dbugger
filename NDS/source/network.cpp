@@ -61,6 +61,25 @@ static inline void quit(const char *format, ...) {
   exit(0);
 }
 
+static inline int recvall(int s, char *buf, size_t len, int flags) {
+  int rc;
+  unsigned int recvd = 0;
+
+  do {
+    rc = recv(s, &(buf[recvd]), len-recvd, flags);
+    if(rc == -1) {
+      if(errno != EWOULDBLOCK)
+        quit("recv: %s\n", strerror(errno));
+      else if(recvd == 0)
+        return -1;
+    }
+    else
+      recvd += rc;
+  } while(recvd < len);
+
+  return recvd;
+}
+
 /* Constructor */
 NetManager::NetManager() {
   listener   = -1;
@@ -205,17 +224,9 @@ void NetManager::connect() {
   iprintf("Listening for Ack message\n");
   memset(&msg, 0, sizeof(msg));
   do {
-    rc = recv(connection, &msg, sizeof(msg), 0);
-    if(rc != sizeof(msg)) {
-      if(rc == -1) {
-        if(errno != EWOULDBLOCK)
-          quit("recv: %s\n", strerror(errno));
-      }
-      else
-        quit("Only recv %d/%d bytes\n", rc, sizeof(msg));
-    }
+    rc = recvall(connection, (char*)&msg, sizeof(msg), 0);
   } while(rc == -1);
-  printf("Received %d bytes\n", sizeof(msg));
+  printf("Received %d bytes\n", rc);
 
   handleAck(connection, msg);
 }
@@ -239,17 +250,10 @@ void NetManager::update() {
   Message msg;
 
   do {
-    rc = recv(connection, &msg, sizeof(msg), 0);
+    rc = recvall(connection, (char*)&msg, sizeof(msg), 0);
     if(rc == sizeof(msg))
       handle[msg.type](connection, msg);
   } while(rc == sizeof(msg));
-
-  if(rc == -1) {
-    if(errno != EWOULDBLOCK)
-      quit("recv: %s", strerror(errno));
-  }
-  else
-    quit("Only recv %d/%d bytes\n", rc, sizeof(msg));
 }
 
 void handleSyn(SOCKET connection, Message &msg) {
@@ -298,17 +302,8 @@ void handleTexture(SOCKET connection, Message &msg) {
      quit("Failed to malloc buffer");
 
   do {
-    rc = recv(connection, buffer, msg.tex.size, 0);
-    if(rc == -1 && errno != EWOULDBLOCK)
-      quit("recv: %s\n", strerror(errno));
+    rc = recvall(connection, (char*)buffer, msg.tex.size, 0);
   } while (rc == -1);
-
-  if(rc != msg.tex.size) {
-    if(rc == -1)
-      quit("recv: %s\n", strerror(errno));
-    else
-      quit("Only recv %d/%d bytes\n", rc, msg.tex.size);
-  }
 
   DC_FlushRange(buffer, msg.tex.size);
   dmaCopy(buffer, msg.tex.address, msg.tex.size);
@@ -355,13 +350,8 @@ void handleDisplayList(SOCKET connection, Message &msg) {
   dispListSize = msg.displist.size;
 
   do {
-    rc = recv(connection, dispList, msg.displist.size, 0);
-    if(rc == -1 && errno != EWOULDBLOCK)
-      quit("recv: %s\n", strerror(errno));
+    rc = recvall(connection, (char*)dispList, msg.displist.size, 0);
   } while(rc == -1);
-
-  if(rc != msg.displist.size)
-    quit("Only recv %d/%d bytes\n", rc, msg.displist.size);
 
   DC_FlushRange(dispList, msg.displist.size);
 
