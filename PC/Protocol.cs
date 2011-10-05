@@ -78,6 +78,8 @@ class Protocol
 
 	static void Main(string[] args)
 	{
+		new DS3dbugger.MainForm().ShowDialog();
+
 		var tcpc = new TcpClient("192.168.1.103", 9393);
 		tcpc.NoDelay = true;
 		var ns = tcpc.GetStream();
