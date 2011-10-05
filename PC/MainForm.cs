@@ -138,6 +138,18 @@ namespace DS3dbugger
 			}
 			bw.Flush();
 			ns.Flush();
+
+			msg.type = MessageType.Message_DisplayCapture;
+			msg.Send(ns);
+
+			BinaryReader br = new BinaryReader(ns);
+			ushort[] screen = new ushort[256*192];
+			for (int i = 0; i < 256 * 192; i++)
+			{
+				screen[i] = br.ReadUInt16();
+			}
+
+			int zzz = 9;
 		}
 	}
 
