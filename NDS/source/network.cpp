@@ -146,22 +146,19 @@ void NetManager::initSockets() {
 }
 
 /* Get connection */
-bool NetManager::handshake() {
+void NetManager::handshake() {
   connection = accept(listener, (struct sockaddr *)&addr, &addr_len);
-  if(connection < 0) {
-    if(errno == EWOULDBLOCK)
-      return true;
-    else
-      return false;
+  if(connection == -1) {
+    if(errno != EWOULDBLOCK)
+      quit("accept: %d", strerror(errno));
   }
+  else {
+    /* close the listening socket (we don't want more connections) */
+    closesocket(listener);
+    listener = -1;
 
-  /* close the listening socket (we don't want more connections) */
-  closesocket(listener);
-  listener = -1;
-
-  iprintf("Accepted connection from %s\n", inet_ntoa(addr.sin_addr));
-
-  return true;
+    iprintf("Accepted connection from %s\n", inet_ntoa(addr.sin_addr));
+  }
 }
 
 /* Do everything necessary to talk to PC */
@@ -177,7 +174,9 @@ void NetManager::connect() {
   iprintf("IP: %s\n", inet_ntoa(ip));
 
   /* wait for PC to connect to us */
-  while(!handshake() && connection < 0) {
+  iprintf("Waiting for connection\n");
+  do {
+    handshake();
     swiWaitForVBlank();
     scanKeys();
 
@@ -185,7 +184,7 @@ void NetManager::connect() {
     if(keysDown() & KEY_B) {
       quit("Quit\n");
     }
-  }
+  } while(connection == -1);
 
   /* send Sync message */
   iprintf("Sending Syn message\n");

@@ -69,7 +69,7 @@ private:
 
   void connectWifi();
   void initSockets();
-  bool handshake();
+  void handshake();
   void shutdown();
 
 public:
