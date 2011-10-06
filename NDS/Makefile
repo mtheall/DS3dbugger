@@ -33,7 +33,7 @@ CFLAGS   += $(INCLUDE) -DARM9
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS := -g $(ARCH)
-LDFLAGS  = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -O3 -flto -fno-use-linker-plugin
+LDFLAGS  = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -O3 -flto
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)

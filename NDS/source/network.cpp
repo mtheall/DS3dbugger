@@ -224,7 +224,7 @@ void NetManager::connect() {
   do {
     rc = recvall(connection, (char*)&msg, sizeof(msg), 0);
   } while(rc == -1);
-  printf("Received %d bytes\n", rc);
+  iprintf("Received %d bytes\n", rc);
 
   handleAck(connection, msg);
 }
