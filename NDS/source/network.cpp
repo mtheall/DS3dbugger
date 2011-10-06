@@ -359,12 +359,13 @@ void handleDisplayList(SOCKET connection, Message &msg) {
 }
 
 void handleDisplayCapture(SOCKET connection, Message &msg) {
-  int       rc;
-  size_t    sent = 0;
-  z_stream  strm;
-  static u8 cap      [256*192*2]; /* 256x192 16bpp buffer =  96KB */
-  static u8 zcap     [128*1024];  /* Ample space for zcap = 128KB */
-  static u8 vram_temp[128*1024];  /* Copy VRAM D          = 128KB */
+  int             rc;
+  size_t          sent = 0;
+  static bool     firstPass = true;
+  static z_stream strm;
+  static u8       cap      [256*192*2]; /* 256x192 16bpp buffer =  96KB */
+  static u8       zcap     [128*1024];  /* Ample space for zcap = 128KB */
+  static u8       vram_temp[128*1024];  /* Copy VRAM D          = 128KB */
 
   if(msg.type != Message_DisplayCapture)
     quit("DisplayCapture: Message type mismatch");
@@ -399,25 +400,41 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
 
   /* initialize compression stream */
   iprintf("Compressing display capture\n");
-  strm.zalloc = NULL;
-  strm.zfree  = NULL;
-  strm.opaque = NULL;
-  rc = deflateInit(&strm, 9);
-  if(rc != Z_OK)
-    quit("Failed to init deflate stream\n");
+  if(firstPass) {
+    strm.zalloc = Z_NULL;
+    strm.zfree  = Z_NULL;
+    strm.opaque = Z_NULL;
+    if(deflateInit(&strm, Z_BEST_COMPRESSION) != Z_OK)
+      quit("deflateInit: %s\n", strm.msg);
+    if(sizeof(zcap) < deflateBound(&strm, sizeof(cap)))
+      quit("zcap is too small\n"
+           "zcap:  %d bytes\n"
+           "bound: %d bytes\n",
+           sizeof(zcap),
+           deflateBound(&strm, sizeof(cap)));
+    firstPass = false;
+  }
+  else {
+    if(deflateReset(&strm) != Z_OK)
+      quit("deflateInit: %s\n", strm.msg);
+  }
 
   /* fill zcap buffer with compressed data */
   strm.avail_in  = sizeof(cap);
   strm.next_in   = cap;
   strm.avail_out = sizeof(zcap);
   strm.next_out  = zcap;
-  rc = deflate(&strm, Z_FINISH);
-  if(rc == Z_STREAM_ERROR)
-    quit("Z_STREAM_ERROR\n");
+
+  do {
+    rc = deflate(&strm, Z_FINISH);
+    if(rc < 0)
+      quit("deflate: %s\n", strm.msg);
+  } while(strm.avail_in > 0 && strm.avail_out > 0);
+
   if(rc != Z_STREAM_END)
     quit("Failed to complete compression\n"
-         "Used %d/%d bytes of zcap\n", strm.avail_out, sizeof(zcap));
-  msg.dispcap.size = strm.avail_out;
+         "Used %d/%d bytes of zcap\n", strm.total_out, sizeof(zcap));
+  msg.dispcap.size = strm.total_out;
 
   /* send compressed data */
   do {
@@ -443,8 +460,5 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
     iprintf("\x1b[28DSent %d/%d bytes", sent, msg.dispcap.size);
   } while(sent < msg.dispcap.size);
   iprintf("\n");
-
-  /* clean up compression stream */
-  deflateEnd(&strm);
 }
 
