@@ -26,14 +26,14 @@ GRAPHICS := gfx
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH := -mthumb -mthumb-interwork -march=armv5te -mtune=arm946e-s
+ARCH := -marm -mthumb-interwork -march=armv5te -mtune=arm946e-s
 
-CFLAGS   := -g -Wall -O3 -fomit-frame-pointer -ffast-math $(ARCH)
+CFLAGS   := -g -Wall -O3 -fomit-frame-pointer -ffast-math $(ARCH) -flto
 CFLAGS   += $(INCLUDE) -DARM9
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS := -g $(ARCH)
-LDFLAGS  = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS  = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -O3 -flto -fno-use-linker-plugin
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)
