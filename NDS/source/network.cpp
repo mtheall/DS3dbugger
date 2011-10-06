@@ -6,14 +6,10 @@
 #include <string.h>
 #include <stdarg.h>
 #include "network.h"
+#include "zlib.h"
 
 static char      spinner[] = { '/', '-', '\\', '|' };
 static const int on              = 1;
-static void     *dispList        = NULL;
-static int       dispListSize    = 0;
-static int       dispListMaxSize = 0;
-static char      cap[256*192*2];
-static char      vram_temp[128*1024];
 
 /* Message handlers */
 void handleSyn(SOCKET connection, Message &msg);
@@ -335,7 +331,9 @@ void handleRegister32(SOCKET connection, Message &msg) {
 }
 
 void handleDisplayList(SOCKET connection, Message &msg) {
-  int rc;
+  int            rc;
+  static void   *dispList        = NULL;
+  static size_t  dispListMaxSize = 0;
 
   if(msg.type != Message_DisplayList)
     quit("DisplayList: Message type mismatch");
@@ -349,7 +347,6 @@ void handleDisplayList(SOCKET connection, Message &msg) {
       quit("No memory for dispList");
     dispListMaxSize = msg.displist.size;
   }
-  dispListSize = msg.displist.size;
 
   do {
     rc = recvall(connection, (char*)dispList, msg.displist.size, 0);
@@ -362,8 +359,12 @@ void handleDisplayList(SOCKET connection, Message &msg) {
 }
 
 void handleDisplayCapture(SOCKET connection, Message &msg) {
-  int rc;
-  size_t sent = 0;
+  int       rc;
+  size_t    sent = 0;
+  z_stream  strm;
+  static u8 cap      [256*192*2]; /* 256x192 16bpp buffer =  96KB */
+  static u8 zcap     [128*1024];  /* Ample space for zcap = 128KB */
+  static u8 vram_temp[128*1024];  /* Copy VRAM D          = 128KB */
 
   if(msg.type != Message_DisplayCapture)
     quit("DisplayCapture: Message type mismatch");
@@ -396,15 +397,54 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
 
   VRAM_D_CR = vram_cr_temp;
 
+  /* initialize compression stream */
+  iprintf("Compressing display capture\n");
+  strm.zalloc = NULL;
+  strm.zfree  = NULL;
+  strm.opaque = NULL;
+  rc = deflateInit(&strm, 9);
+  if(rc != Z_OK)
+    quit("Failed to init deflate stream\n");
+
+  /* fill zcap buffer with compressed data */
+  strm.avail_in  = sizeof(cap);
+  strm.next_in   = cap;
+  strm.avail_out = sizeof(zcap);
+  strm.next_out  = zcap;
+  rc = deflate(&strm, Z_FINISH);
+  if(rc == Z_STREAM_ERROR)
+    quit("Z_STREAM_ERROR\n");
+  if(rc != Z_STREAM_END)
+    quit("Failed to complete compression\n"
+         "Used %d/%d bytes of zcap\n", strm.avail_out, sizeof(zcap));
+  msg.dispcap.size = strm.avail_out;
+
+  /* send compressed data */
   do {
-    rc = send(connection, &cap[sent], (256*192*2)-sent, 0);
+    rc = send(connection, &msg, sizeof(msg), 0);
+    if(rc == -1 && errno != EWOULDBLOCK)
+      quit("send: %s\n", strerror(errno));
+    else if(rc != sizeof(msg))
+      quit("Only sent %d/%d bytes\n", rc, sizeof(msg));
+  } while(rc == -1);
+
+  iprintf("Sent %d/%d bytes", sent, msg.dispcap.size);
+  do {
+    /* only send 1KB at a time */
+    int toSend = msg.dispcap.size-sent < 1024 ? msg.dispcap.size-sent : 1024;
+    rc = send(connection, &zcap[sent], toSend, 0);
     if(rc == -1) {
       if(errno != EWOULDBLOCK)
-        quit("send: %s\n", strerror(errno));
+        quit("\nsend: %s\n", strerror(errno));
     }
     else
       sent += rc;
-  } while(sent < 256*192*2);
-  iprintf("sent %d bytes\n", sent);
+    swiWaitForVBlank(); /* don't try to send too fast */
+    iprintf("\x1b[28DSent %d/%d bytes", sent, msg.dispcap.size);
+  } while(sent < msg.dispcap.size);
+  iprintf("\n");
+
+  /* clean up compression stream */
+  deflateEnd(&strm);
 }
 

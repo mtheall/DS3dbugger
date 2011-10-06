@@ -35,8 +35,8 @@ typedef struct
     } ack;
 
     struct {
-      void *address;
-      int   size;
+      void   *address;
+      size_t  size;
     } tex;
 
     struct {
@@ -50,10 +50,11 @@ typedef struct
     } register32;
 
     struct {
-      int size;
+      size_t size;
     } displist;
 
     struct {
+      size_t size;
     } dispcap;
   };
 } Message;
