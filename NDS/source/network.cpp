@@ -416,7 +416,7 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
   }
   else {
     if(deflateReset(&strm) != Z_OK)
-      quit("deflateInit: %s\n", strm.msg);
+      quit("deflateReset: %s\n", strm.msg);
   }
 
   /* fill zcap buffer with compressed data */
