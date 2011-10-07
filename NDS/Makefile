@@ -26,26 +26,26 @@ GRAPHICS := gfx
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH := -mthumb -mthumb-interwork -march=armv5te -mtune=arm946e-s
+ARCH := -marm -mthumb-interwork -march=armv5te -mtune=arm946e-s
 
-CFLAGS   := -g -Wall -O3 -fomit-frame-pointer -ffast-math $(ARCH)
+CFLAGS   := -g -Wall -O3 -fomit-frame-pointer -ffast-math $(ARCH) -flto
 CFLAGS   += $(INCLUDE) -DARM9
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS := -g $(ARCH)
-LDFLAGS  = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS  = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -O3 -flto
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)
 #---------------------------------------------------------------------------------
-LIBS := -lmm9 -ldswifi9 -lfilesystem -lfat -lnds9
+LIBS := -lz -ldswifi9 -lnds9
  
  
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS := $(LIBNDS)
+LIBDIRS := $(LIBNDS) $(PORTLIBS)
  
 #---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
