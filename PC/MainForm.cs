@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
@@ -17,6 +19,7 @@ namespace DS3dbugger
 {
 	public partial class MainForm : Form
 	{
+		[STAThread]
 		static void Main(string[] args)
 		{
 			new DS3dbugger.MainForm().ShowDialog();
@@ -25,12 +28,30 @@ namespace DS3dbugger
 		ConfigStruct Config = new ConfigStruct();
 
 		string fnPrefs;
-		public MainForm()
+		unsafe public MainForm()
 		{
 			InitializeComponent();
 			fnPrefs = Path.Combine(Path.GetTempPath(), "DS3dbugger.txt");
 			Config = ConfigService.Load<ConfigStruct>(fnPrefs);
 			txtHost.Text = Config.host;
+
+			lastScreen = new System.Drawing.Bitmap(256, 192, PixelFormat.Format32bppArgb);
+			using (var g = Graphics.FromImage(lastScreen))
+				g.Clear(Color.Black);
+			SetViewport(lastScreen);
+		}
+
+		void SetViewport(Bitmap bmp)
+		{
+			var bmpLarge = new Bitmap(512, 384, PixelFormat.Format32bppArgb);
+			using (var g = Graphics.FromImage(bmpLarge))
+			{
+				g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+				g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+				g.DrawImage(bmp, 0, 0, 512, 384);
+			}
+
+			vpDSScreen.SetBitmap(bmpLarge);
 		}
 
 		protected override void OnClosed(EventArgs e)
@@ -76,7 +97,7 @@ namespace DS3dbugger
 0x00000000,
 0xFFFFFCCE,
 0x00000000,
-0x00000020, 0x00007FFF,
+0x00000020, 0x0000001F,
 0x00000029, 0x001F00C0,
 0x00000010, 0x00000002,
 0x00000011,
@@ -109,6 +130,54 @@ namespace DS3dbugger
 0x00000050, 0x00000000,
 		};
 
+		Bitmap lastScreen;
+		unsafe void AcquireScreen()
+		{
+			Message msg = new Message();
+			msg.type = MessageType.Message_DisplayCapture;
+			msg.Send(ns);
+
+			msg.Recv(ns);
+			int zipped_size = msg.dispcap_size;
+			BinaryReader br = new BinaryReader(ns);
+			byte[] zipbuf = new byte[zipped_size];
+			for (int i = 0; i < zipped_size; i++)
+				zipbuf[i] = br.ReadByte();
+
+			var inf = new ICSharpCode.SharpZipLib.Zip.Compression.Inflater();
+			inf.SetInput(zipbuf);
+			byte[] bscreen = new byte[256 * 192 * 2];
+			inf.Inflate(bscreen);
+
+			int zzz = 9;
+
+			var bmp = new Bitmap(256, 192, PixelFormat.Format32bppArgb);
+			BitmapData bmpdata = bmp.LockBits(new System.Drawing.Rectangle(0, 0, 256, 192), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+			byte* bp = (byte*)bmpdata.Scan0.ToPointer();
+			for (int i = 0; i < 256 * 192; i++)
+			{
+			    int r = bscreen[i * 2] & 0x1F;
+			    int g = ((bscreen[i * 2] & 0xE0)>>5) | ((bscreen[i*2+1] & 3)<<3);
+				int b = (bscreen[i * 2 + 1] >> 2) & 0x1F;
+				int a = bscreen[i * 2 + 1] >> 7;
+
+				//todo - use same color conversion as desmume (whatever that is)
+				r <<= 3;
+				g <<= 3;
+				b <<= 3;
+
+				bp[i * 4 + 0] = (byte)b;
+				bp[i * 4 + 1] = (byte)g;
+				bp[i * 4 + 2] = (byte)r;
+				bp[i * 4 + 3] = 255;
+			}
+			bmp.UnlockBits(bmpdata);
+
+			if (lastScreen != null) lastScreen.Dispose();
+			lastScreen = bmp;
+			SetViewport(lastScreen);
+		}
+
 		TcpClient tcpc;
 		NetworkStream ns;
 		private void btnConnect_Click(object sender, EventArgs e)
@@ -139,17 +208,17 @@ namespace DS3dbugger
 			bw.Flush();
 			ns.Flush();
 
-			msg.type = MessageType.Message_DisplayCapture;
-			msg.Send(ns);
+			AcquireScreen();
+		}
 
-			BinaryReader br = new BinaryReader(ns);
-			ushort[] screen = new ushort[256*192];
-			for (int i = 0; i < 256 * 192; i++)
-			{
-				screen[i] = br.ReadUInt16();
-			}
+		private void btnAcquireScreen_Click(object sender, EventArgs e)
+		{
+			AcquireScreen();
+		}
 
-			int zzz = 9;
+		private void btnCopyScreen_Click(object sender, EventArgs e)
+		{
+			System.Windows.Forms.Clipboard.SetImage(lastScreen);
 		}
 	}
 

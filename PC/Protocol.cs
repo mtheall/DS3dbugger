@@ -38,7 +38,7 @@ namespace DS3dbugger
 		[FieldOffset(4)]
 		public uint register16_address;
 		[FieldOffset(8)]
-		public ushort register16_valie;
+		public ushort register16_value;
 
 		[FieldOffset(4)]
 		public uint register32_address;
@@ -47,6 +47,9 @@ namespace DS3dbugger
 
 		[FieldOffset(4)]
 		public int displist_size;
+
+		[FieldOffset(4)]
+		public int dispcap_size;
 
 		public void Send(Stream s)
 		{
