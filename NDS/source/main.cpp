@@ -10,6 +10,7 @@ int main(int argc, char *argv[]) {
   vramSetBankH(VRAM_H_SUB_BG);
   consoleInit(0, 0, BgType_Text4bpp, BgSize_T_256x256, 2, 0, false, true);
 
+	//ideally we would handle this with register writes and display list stuff from the client. but for now, here it is.
 	glInit();
 
   net.connect();
