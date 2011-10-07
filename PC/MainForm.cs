@@ -7,7 +7,6 @@ using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
-using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
@@ -116,6 +115,7 @@ namespace DS3dbugger
 0x0000001C, 0x00003000,
 0x00000000,
 0x00000000,
+0x00000020, 0x000003E0,
 0x00000040, 0x00000001,
 0x00000023, 0x1000F000,
 0x00000000,
