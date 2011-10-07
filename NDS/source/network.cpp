@@ -374,7 +374,7 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
 
   /* change VRAM D to LCD mode */
   u8 vram_cr_temp = VRAM_D_CR;
-  VRAM_D_CR = VRAM_D_LCD;
+  VRAM_D_CR = VRAM_D_LCD | VRAM_ENABLE;
 
   /* keep old copy of VRAM D */
   dmaCopy(VRAM_D, vram_temp, 128*1024);
