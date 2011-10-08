@@ -9,7 +9,7 @@
 #include "zlib.h"
 
 static char      spinner[] = { '/', '-', '\\', '|' };
-static const int on              = 1;
+static const int on        = 1;
 
 /* Message handlers */
 void handleSyn(SOCKET connection, Message &msg);
@@ -59,12 +59,13 @@ static inline void quit(const char *format, ...) {
   exit(0);
 }
 
-static inline int recvall(int s, char *buf, size_t len, int flags) {
-  int rc;
+static inline int RECV(int s, char *buf, size_t len, int flags) {
+  int    rc;
   size_t recvd = 0;
 
   do {
-    rc = recv(s, &(buf[recvd]), len-recvd, flags);
+    int toRecv = len-recvd < 1024 ? len-recvd : 1024;
+    rc = recv(s, &(buf[recvd]), toRecv, flags);
     if(rc == -1) {
       if(errno != EWOULDBLOCK)
         quit("recv: %s\n", strerror(errno));
@@ -73,9 +74,33 @@ static inline int recvall(int s, char *buf, size_t len, int flags) {
     }
     else
       recvd += rc;
+    if(toRecv == 1024)
+      swiWaitForVBlank();
   } while(recvd < len);
 
   return recvd;
+}
+
+static inline int SEND(int s, char *buf, size_t len, int flags) {
+  int    rc;
+  size_t sent = 0;
+
+  do {
+    int toSend = len-sent < 1024 ? len-sent : 1024;
+    rc = send(s, &(buf[sent]), toSend, flags);
+    if(rc == -1) {
+      if(errno != EWOULDBLOCK)
+        quit("send: %s\n", strerror(errno));
+      else if(sent == 0)
+        return -1;
+    }
+    else
+      sent += rc;
+    if(toSend == 1024)
+      swiWaitForVBlank();
+  } while(sent < len);
+
+  return sent;
 }
 
 /* Constructor */
@@ -117,11 +142,9 @@ void NetManager::connectWifi() {
     iprintf("%c", spinner[spin/5]);
   }
   if(rc == ASSOCSTATUS_ASSOCIATED)
-    iprintf("OK!\n");
+    iprintf("\x08OK!\n");
   else if(rc == ASSOCSTATUS_CANNOTCONNECT)
-    quit("Failed\n");
-
-  iprintf("OK!\n");
+    quit("\x08""Failed\n");
 
   /* Get IP */
   ip = Wifi_GetIPInfo(NULL, NULL, NULL, NULL);
@@ -204,27 +227,19 @@ void NetManager::connect() {
   } while(connection == -1);
 
   /* send Sync message */
-  iprintf("Sending Syn message\n");
   memset(&msg, 0, sizeof(msg));
   msg.type      = Message_Syn;
   msg.syn.magic = 0xDEADBEEF;
 
-  rc = send(connection, &msg, sizeof(msg), 0);
-  if(rc != sizeof(msg)) {
-    if(rc == -1)
-      quit("send: %s\n", strerror(errno));
-    else
-      quit("Only sent %d/%d bytes\n", rc, sizeof(msg));
-  }
-  iprintf("Sent %d bytes\n", sizeof(msg));
+  do {
+    rc = SEND(connection, (char*)&msg, sizeof(msg), 0);
+  } while(rc == -1);
 
   /* receive Acknowledge message */
-  iprintf("Listening for Ack message\n");
   memset(&msg, 0, sizeof(msg));
   do {
-    rc = recvall(connection, (char*)&msg, sizeof(msg), 0);
+    rc = RECV(connection, (char*)&msg, sizeof(msg), 0);
   } while(rc == -1);
-  iprintf("Received %d bytes\n", rc);
 
   handleAck(connection, msg);
 }
@@ -248,9 +263,11 @@ void NetManager::update() {
   Message msg;
 
   do {
-    rc = recvall(connection, (char*)&msg, sizeof(msg), 0);
-    if(rc == sizeof(msg))
+    rc = RECV(connection, (char*)&msg, sizeof(msg), 0);
+    if(rc == sizeof(msg) && msg.type >= Message_Syn && msg.type <= Message_DisplayCapture)
       handle[msg.type](connection, msg);
+    else if(rc == sizeof(msg))
+      quit("Invalid message type: %d\n", msg.type);
   } while(rc == sizeof(msg));
 }
 
@@ -265,14 +282,10 @@ void handleSyn(SOCKET connection, Message &msg) {
   iprintf("Got Syn message\n");
 
   msg.type = Message_Ack;
-  rc = send(connection, &msg, sizeof(msg), 0);
 
-  if(rc != sizeof(msg)) {
-    if(rc == -1)
-      quit("send: %s\n", strerror(errno));
-    else
-      quit("Only sent %d/%d bytes\n", rc, sizeof(msg));
-  }
+  do {
+    rc = SEND(connection, (char*)&msg, sizeof(msg), 0);
+  } while(rc == -1);
 }
 
 void handleAck(SOCKET connection, Message &msg) {
@@ -300,7 +313,7 @@ void handleTexture(SOCKET connection, Message &msg) {
      quit("Failed to malloc buffer");
 
   do {
-    rc = recvall(connection, (char*)buffer, msg.tex.size, 0);
+    rc = RECV(connection, (char*)buffer, msg.tex.size, 0);
   } while (rc == -1);
 
   DC_FlushRange(buffer, msg.tex.size);
@@ -349,23 +362,22 @@ void handleDisplayList(SOCKET connection, Message &msg) {
   }
 
   do {
-    rc = recvall(connection, (char*)dispList, msg.displist.size, 0);
+    rc = RECV(connection, (char*)dispList, msg.displist.size, 0);
   } while(rc == -1);
   iprintf("Received %d bytes\n", rc);
 
   DC_FlushRange(dispList, msg.displist.size);
 
+  glFlush(0);
+  swiWaitForVBlank();
   glCallList((u32*)dispList);
 }
 
 void handleDisplayCapture(SOCKET connection, Message &msg) {
-  int             rc;
-  size_t          sent = 0;
-  static bool     firstPass = true;
-  static z_stream strm;
-  static u8       cap      [256*192*2]; /* 256x192 16bpp buffer =  96KB */
-  static u8       zcap     [128*1024];  /* Ample space for zcap = 128KB */
-  static u8       vram_temp[128*1024];  /* Copy VRAM D          = 128KB */
+  int       rc;
+  static u8 cap      [256*192*2]; /* 256x192 16bpp buffer =  96KB */
+  static u8 zcap     [128*1024];  /* Ample space for zcap = 128KB */
+  static u8 vram_temp[128*1024];  /* Copy VRAM D          = 128KB */
 
   if(msg.type != Message_DisplayCapture)
     quit("DisplayCapture: Message type mismatch");
@@ -391,74 +403,28 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
 
   /* copy capture into buffer */
   dmaCopy(VRAM_D, cap, 256*192*2);
-  DC_InvalidateAll();
+  DC_InvalidateRange(cap, sizeof(cap));
 
   /* move old copy back into VRAM D */
   dmaCopy(vram_temp, VRAM_D, 128*1024);
 
   VRAM_D_CR = vram_cr_temp;
 
-  /* initialize compression stream */
-  iprintf("Compressing display capture\n");
-  if(firstPass) {
-    strm.zalloc = Z_NULL;
-    strm.zfree  = Z_NULL;
-    strm.opaque = Z_NULL;
-    if(deflateInit(&strm, Z_BEST_COMPRESSION) != Z_OK)
-      quit("deflateInit: %s\n", strm.msg);
-    if(sizeof(zcap) < deflateBound(&strm, sizeof(cap)))
-      quit("zcap is too small\n"
-           "zcap:  %d bytes\n"
-           "bound: %d bytes\n",
-           sizeof(zcap),
-           deflateBound(&strm, sizeof(cap)));
-    firstPass = false;
-  }
-  else {
-    if(deflateReset(&strm) != Z_OK)
-      quit("deflateReset: %s\n", strm.msg);
-  }
-
   /* fill zcap buffer with compressed data */
-  strm.avail_in  = sizeof(cap);
-  strm.next_in   = cap;
-  strm.avail_out = sizeof(zcap);
-  strm.next_out  = zcap;
-
-  do {
-    rc = deflate(&strm, Z_FINISH);
-    if(rc < 0)
-      quit("deflate: %s\n", strm.msg);
-  } while(strm.avail_in > 0 && strm.avail_out > 0);
-
-  if(rc != Z_STREAM_END)
-    quit("Failed to complete compression\n"
-         "Used %d/%d bytes of zcap\n", strm.total_out, sizeof(zcap));
-  msg.dispcap.size = strm.total_out;
+  msg.dispcap.size = sizeof(zcap);
+  rc = compress2(zcap, (uLongf*)&msg.dispcap.size, cap, sizeof(cap), Z_BEST_COMPRESSION);
+  if(rc != Z_OK)
+    quit("compress2: failure\n");
+  msg.type = Message_DisplayCapture;
 
   /* send compressed data */
   do {
-    rc = send(connection, &msg, sizeof(msg), 0);
-    if(rc == -1 && errno != EWOULDBLOCK)
-      quit("send: %s\n", strerror(errno));
-    else if(rc != sizeof(msg))
-      quit("Only sent %d/%d bytes\n", rc, sizeof(msg));
+    rc = SEND(connection, (char*)&msg, sizeof(msg), 0);
   } while(rc == -1);
 
-  iprintf("Sent %d/%d bytes", sent, msg.dispcap.size);
   do {
-    /* only send 1KB at a time */
-    int toSend = msg.dispcap.size-sent < 1024 ? msg.dispcap.size-sent : 1024;
-    rc = send(connection, &zcap[sent], toSend, 0);
-    if(rc == -1) {
-      if(errno != EWOULDBLOCK)
-        quit("\nsend: %s\n", strerror(errno));
-    }
-    else
-      sent += rc;
-    swiWaitForVBlank(); /* don't try to send too fast */
-    iprintf("\x1b[28DSent %d/%d bytes", sent, msg.dispcap.size);
-  } while(sent < msg.dispcap.size);
-  iprintf("\n");
+    rc = SEND(connection, (char*)&zcap, msg.dispcap.size, 0);
+  } while(rc == -1);
+  iprintf("Sent %d bytes\n", rc);
 }
 
