@@ -142,9 +142,9 @@ void NetManager::connectWifi() {
     iprintf("%c", spinner[spin/5]);
   }
   if(rc == ASSOCSTATUS_ASSOCIATED)
-    iprintf("OK!\n");
+    iprintf("\x08OK!\n");
   else if(rc == ASSOCSTATUS_CANNOTCONNECT)
-    quit("Failed\n");
+    quit("\x08""Failed\n");
 
   /* Get IP */
   ip = Wifi_GetIPInfo(NULL, NULL, NULL, NULL);
@@ -368,6 +368,8 @@ void handleDisplayList(SOCKET connection, Message &msg) {
 
   DC_FlushRange(dispList, msg.displist.size);
 
+  glFlush(0);
+  swiWaitForVBlank();
   glCallList((u32*)dispList);
 }
 
