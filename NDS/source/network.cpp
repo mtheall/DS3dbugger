@@ -383,7 +383,6 @@ void handleDisplayList(SOCKET connection, Message &msg) {
 
   DC_FlushRange(zscratch, size);
 
-  glFlush(0);
   swiWaitForVBlank();
   glCallList((u32*)zscratch);
 }
@@ -405,6 +404,9 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
 
   /* keep old copy of VRAM D */
   dmaCopy(VRAM_D, vram_temp, 128*1024);
+
+  /* wait two frames to make sure the scene actually rendered */
+  swiWaitForVBlank();
   swiWaitForVBlank();
 
   /* start capture */
