@@ -24,6 +24,16 @@ namespace DS3dbugger
 			new DS3dbugger.MainForm().ShowDialog();
 		}
 
+		static byte[] compress(byte[] input)
+		{
+			System.IO.MemoryStream ms = new MemoryStream();
+			var def = new ICSharpCode.SharpZipLib.Zip.Compression.Streams.DeflaterOutputStream(ms, new ICSharpCode.SharpZipLib.Zip.Compression.Deflater(9));
+			def.Write(input, 0, input.Length);
+			def.Flush();
+			def.Finish();
+			return ms.ToArray();
+		}
+
 		ConfigStruct Config = new ConfigStruct();
 
 		string fnPrefs;
@@ -60,6 +70,7 @@ namespace DS3dbugger
 		}
 
 		uint[] testData = new uint[] {
+			68,         // Length
 		0x15101210,
 			0x00000002, // MTX_MODE Position & Vector Simultaneous Set mode
 			0x00000000, // MTX_POP 0
@@ -206,17 +217,13 @@ namespace DS3dbugger
 			btnConnect.Text = "connected";
 			txtHost.ReadOnly = true;
 
+			byte[] toSend = compress(testData.Select(x => BitConverter.GetBytes(x)).SelectMany(x => x).ToArray());
+
 			msg.type = MessageType.Message_DisplayList;
-			msg.displist_size = testData.Length * 4 + 4;
+			msg.displist_size = (int)toSend.Length;
 			msg.Send(ns);
 
-			BinaryWriter bw = new BinaryWriter(ns);
-			bw.Write(testData.Length);
-			for (int i = 0; i < testData.Length;i++ )
-			{
-				bw.Write(testData[i]);
-			}
-			bw.Flush();
+			ns.Write(toSend, 0, toSend.Length);
 			ns.Flush();
 
 			AcquireScreen();
@@ -252,16 +259,14 @@ namespace DS3dbugger
 				fr.Read(buffer, 0, length);
 				fr.Close();
 
-				BinaryWriter bw = new BinaryWriter(ns);
+				byte[] toSend = compress(buffer);
+
 				Message msg = new Message();
 				msg.type = MessageType.Message_DisplayList;
-				msg.displist_size = length + 4;
+				msg.displist_size = buffer.Length;
 				msg.Send(ns);
 
-				bw.Write(length);
-				bw.Write(buffer, 0, length);
-
-				bw.Flush();
+				ns.Write(buffer, 0, buffer.Length);
 				ns.Flush();
 			}
 		}

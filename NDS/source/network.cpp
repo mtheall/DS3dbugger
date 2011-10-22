@@ -10,6 +10,7 @@
 
 static char      spinner[] = { '/', '-', '\\', '|' };
 static const int on        = 1;
+static u8        zscratch[1048576];
 
 /* Message handlers */
 void handleSyn(SOCKET connection, Message &msg);
@@ -53,7 +54,7 @@ static inline void quit(const char *format, ...) {
   Wifi_DisconnectAP();
   Wifi_DisableWifi();
 
-  iprintf("\nPress B to exit");
+  iprintf("Press B to exit\n");
   waitForKey(KEY_B);
 
   exit(0);
@@ -190,7 +191,7 @@ void NetManager::handshake() {
   connection = accept(listener, (struct sockaddr *)&addr, &addr_len);
   if(connection == -1) {
     if(errno != EWOULDBLOCK)
-      quit("accept: %d", strerror(errno));
+      quit("accept: %d\n", strerror(errno));
   }
   else {
     /* close the listening socket (we don't want more connections) */
@@ -274,7 +275,7 @@ void NetManager::update() {
 void handleSyn(SOCKET connection, Message &msg) {
   int rc;
   if(msg.type != Message_Syn)
-    quit("Syn: Message type mismatch");
+    quit("Syn: Message type mismatch\n");
 
   if(msg.syn.magic != 0xDEADBEEF)
     quit("Syn: Bad magic\n");
@@ -290,40 +291,50 @@ void handleSyn(SOCKET connection, Message &msg) {
 
 void handleAck(SOCKET connection, Message &msg) {
   if(msg.type != Message_Ack)
-    quit("Ack: Message type mismatch");
+    quit("Ack: Message type mismatch\n");
   if(msg.ack.magic != 0xDEADBEEF)
-    quit("Ack: Bad magic");
+    quit("Ack: Bad magic\n");
 
   iprintf("Got Ack message\n");
 }
 
 void handleTexture(SOCKET connection, Message &msg) {
-  int rc;
-  void *buffer;
+  int            rc;
+  size_t         size;
+  static u8     *buffer        = NULL;
+  static size_t  bufferMaxSize = 0;
 
   if(msg.type != Message_Texture)
-    quit("Texture: Message type mismatch");
+    quit("Texture: Message type mismatch\n");
 
   iprintf("Got Texture message\n");
   iprintf("  Address: %08X\n", (u32)msg.tex.address);
   iprintf("  Size:    %8d\n", msg.tex.size);
 
-  buffer = malloc(msg.tex.size);
-  if(buffer == NULL)
-     quit("Failed to malloc buffer");
+  if(msg.tex.size > bufferMaxSize) {
+    buffer = (u8*)realloc(buffer, msg.tex.size);
+    if(buffer == NULL)
+       quit("Failed to realloc buffer\n");
+    bufferMaxSize = msg.tex.size;
+  }
 
   do {
     rc = RECV(connection, (char*)buffer, msg.tex.size, 0);
   } while (rc == -1);
 
-  DC_FlushRange(buffer, msg.tex.size);
-  dmaCopy(buffer, msg.tex.address, msg.tex.size);
-  free(buffer);
+  size = sizeof(zscratch);
+  if(uncompress(zscratch, (uLongf*)&size, buffer, msg.tex.size) != Z_OK)
+    quit("uncompress: failure\n");
+
+  DC_FlushRange(zscratch, size);
+
+  swiWaitForVBlank();
+  dmaCopy(zscratch, msg.tex.address, size);
 }
 
 void handleRegister16(SOCKET connection, Message &msg) {
   if(msg.type != Message_Register16)
-    quit("Register16: Message type mismatch");
+    quit("Register16: Message type mismatch\n");
 
   iprintf("Got Register16 message\n");
   iprintf("  Address: %08X\n", (u32)msg.register16.address);
@@ -334,7 +345,7 @@ void handleRegister16(SOCKET connection, Message &msg) {
 
 void handleRegister32(SOCKET connection, Message &msg) {
   if(msg.type != Message_Register32)
-    quit("Register32: Message type mismatch");
+    quit("Register32: Message type mismatch\n");
 
   iprintf("Got Register32 message\n");
   iprintf("  Address: %08X\n", (u32)msg.register32.address);
@@ -345,32 +356,35 @@ void handleRegister32(SOCKET connection, Message &msg) {
 
 void handleDisplayList(SOCKET connection, Message &msg) {
   int            rc;
-  static void   *dispList        = NULL;
+  size_t         size;
+  static u8     *dispList        = NULL;
   static size_t  dispListMaxSize = 0;
 
   if(msg.type != Message_DisplayList)
-    quit("DisplayList: Message type mismatch");
+    quit("DisplayList: Message type mismatch\n");
 
   iprintf("Got DisplayList message\n");
   iprintf("  Size:    %8d\n", msg.displist.size);
 
   if(msg.displist.size > dispListMaxSize) {
-    dispList = realloc(dispList, msg.displist.size);
+    dispList = (u8*)realloc(dispList, msg.displist.size);
     if(dispList == NULL)
-      quit("No memory for dispList");
+      quit("Failed to realloc dispList\n");
     dispListMaxSize = msg.displist.size;
   }
 
   do {
     rc = RECV(connection, (char*)dispList, msg.displist.size, 0);
   } while(rc == -1);
-  iprintf("Received %d bytes\n", rc);
 
-  DC_FlushRange(dispList, msg.displist.size);
+  size = sizeof(zscratch);
+  if(uncompress(zscratch, (uLongf*)&size, dispList, msg.displist.size) != Z_OK)
+    quit("uncompress: failure\n");
 
-  glFlush(0);
+  DC_FlushRange(zscratch, size);
+
   swiWaitForVBlank();
-  glCallList((u32*)dispList);
+  glCallList((u32*)zscratch);
 }
 
 void handleDisplayCapture(SOCKET connection, Message &msg) {
@@ -380,7 +394,7 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
   static u8 vram_temp[128*1024];  /* Copy VRAM D          = 128KB */
 
   if(msg.type != Message_DisplayCapture)
-    quit("DisplayCapture: Message type mismatch");
+    quit("DisplayCapture: Message type mismatch\n");
 
   iprintf("Got DisplayCapture message\n");
 
@@ -390,6 +404,9 @@ void handleDisplayCapture(SOCKET connection, Message &msg) {
 
   /* keep old copy of VRAM D */
   dmaCopy(VRAM_D, vram_temp, 128*1024);
+
+  /* wait two frames to make sure the scene actually rendered */
+  swiWaitForVBlank();
   swiWaitForVBlank();
 
   /* start capture */
