@@ -52,16 +52,18 @@ public class RetainedViewportPanel : Control
 
 	void DoPaint()
 	{
-		if (bmp != null)
+		using (Graphics g = CreateGraphics())
 		{
-			using (Graphics g = CreateGraphics())
+			if (bmp != null)
 			{
-				g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+				g.PixelOffsetMode = PixelOffsetMode.Half;
 				g.InterpolationMode = InterpolationMode.NearestNeighbor;
 				g.CompositingMode = CompositingMode.SourceCopy;
 				g.CompositingQuality = CompositingQuality.HighSpeed;
 				g.DrawImage(bmp, 0, 0, Width, Height);
 			}
+			else
+				g.Clear(Color.Black);
 		}
 
 		CleanupDisposeQueue();

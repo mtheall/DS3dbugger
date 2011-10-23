@@ -24,22 +24,25 @@ namespace DS3dbugger
 			new DS3dbugger.MainForm().ShowDialog();
 		}
 
-		static byte[] compress(byte[] input)
-		{
-			System.IO.MemoryStream ms = new MemoryStream();
-			var def = new ICSharpCode.SharpZipLib.Zip.Compression.Streams.DeflaterOutputStream(ms, new ICSharpCode.SharpZipLib.Zip.Compression.Deflater(9));
-			def.Write(input, 0, input.Length);
-			def.Flush();
-			def.Finish();
-			return ms.ToArray();
-		}
+		Project CurrProject = new Project();
 
 		ConfigStruct Config = new ConfigStruct();
 
+		RadioButton[] rbTexFormats;
 		string fnPrefs;
 		unsafe public MainForm()
 		{
 			InitializeComponent();
+
+			rbTexFmt1_A3I5.Tag = TextureFormat.Format1_A3I5;
+			rbTexFmt2_I2.Tag = TextureFormat.Format2_I2;
+			rbTexFmt3_I4.Tag = TextureFormat.Format3_I4;
+			rbTexFmt4_I8.Tag = TextureFormat.Format4_I8;
+			rbTexFmt5_4x4.Tag = TextureFormat.Format5_4x4;
+			rbTexFmt6_A5I3.Tag = TextureFormat.Format6_A5I3;
+			rbTexFmt7_16bpp.Tag = TextureFormat.Format7_16bpp;
+			rbTexFormats = new[] { rbTexFmt1_A3I5, rbTexFmt2_I2, rbTexFmt3_I4, rbTexFmt4_I8, rbTexFmt5_4x4, rbTexFmt6_A5I3, rbTexFmt7_16bpp };
+
 			fnPrefs = Path.Combine(Path.GetTempPath(), "DS3dbugger.txt");
 			Config = ConfigService.Load<ConfigStruct>(fnPrefs);
 			txtHost.Text = Config.host;
@@ -48,6 +51,9 @@ namespace DS3dbugger
 			using (var g = Graphics.FromImage(lastScreen))
 				g.Clear(Color.Black);
 			SetViewport(lastScreen);
+
+			PathManager.CurrProjectPath = Path.Combine(PathManager.CurrDirectory, "untitled.3dproj");
+			SyncTitle();
 		}
 
 		void SetViewport(Bitmap bmp)
@@ -217,7 +223,7 @@ namespace DS3dbugger
 			btnConnect.Text = "connected";
 			txtHost.ReadOnly = true;
 
-			byte[] toSend = compress(testData.Select(x => BitConverter.GetBytes(x)).SelectMany(x => x).ToArray());
+			byte[] toSend = Util.Compress(testData.Select(x => BitConverter.GetBytes(x)).SelectMany(x => x).ToArray());
 
 			msg.type = MessageType.Message_DisplayList;
 			msg.displist_size = (int)toSend.Length;
@@ -259,7 +265,7 @@ namespace DS3dbugger
 				fr.Read(buffer, 0, length);
 				fr.Close();
 
-				byte[] toSend = compress(buffer);
+				byte[] toSend = Util.Compress(buffer);
 
 				Message msg = new Message();
 				msg.type = MessageType.Message_DisplayList;
@@ -269,6 +275,160 @@ namespace DS3dbugger
 				ns.Write(buffer, 0, buffer.Length);
 				ns.Flush();
 			}
+		}
+
+		private void lvTextures_DragDrop(object sender, DragEventArgs e)
+		{
+			foreach (var fn in e.Data.GetData("FileDrop") as string[])
+			{
+				string relative = PathManager.Relativeize(fn);
+				if (relative == null)
+				{
+					MessageBox.Show("Texture wasn't in a subdirectory relative to the project file");
+					return;
+				}
+				CurrProject.DefineTexture(relative);
+			}
+			SyncTextures();
+		}
+
+		void SyncTextures()
+		{
+			lvTextures.Clear();
+			lvTextures.LargeImageList = new ImageList();
+			lvTextures.LargeImageList.ImageSize = new Size(32, 32);
+			foreach (var tex in CurrProject.TextureReferences)
+			{
+				var lvi = new ListViewItem();
+				lvi.Text = tex.Name;
+				lvi.ImageIndex = lvTextures.LargeImageList.Images.Count;
+				lvi.Tag = tex;
+				lvTextures.LargeImageList.Images.Add(tex.Bmp);
+				lvTextures.Items.Add(lvi);
+			}
+		}
+
+		private void lvTextures_DragEnter(object sender, DragEventArgs e)
+		{
+			e.Effect = DragDropEffects.Link;
+		}
+
+		private void lvTextures_DragOver(object sender, DragEventArgs e)
+		{
+			e.Effect = DragDropEffects.Link;
+		}
+
+		private void btnNewProject_Click(object sender, EventArgs e)
+		{
+			var sfd = new System.Windows.Forms.SaveFileDialog();
+			sfd.DefaultExt = "3dproj";
+			sfd.Filter = "DS3dbugger project files (*.3dproj)|*.3dproj";
+			sfd.InitialDirectory = PathManager.CurrDirectory;
+			sfd.RestoreDirectory = true;
+			//sfd.FileOk += new CancelEventHandler(ParticleFileValidate);
+			sfd.OverwritePrompt = true;
+			if (sfd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+			{
+				PathManager.CurrProjectPath = sfd.FileName;
+				PathManager.CurrDirectory = Path.GetDirectoryName(sfd.FileName);
+				SaveProject();
+				SyncTitle();
+			}
+		}
+
+		void SyncTitle()
+		{
+			Text = string.Format("DS3dbugger - {0}", Path.GetFileName(PathManager.CurrProjectPath));
+		}
+
+		void SaveProject()
+		{
+			File.WriteAllText(PathManager.CurrProjectPath, "");
+		}
+
+		private void btnOpenProject_Click(object sender, EventArgs e)
+		{
+			var ofd = new System.Windows.Forms.OpenFileDialog();
+			ofd.DefaultExt = "3dproj";
+			ofd.Filter = "DS3dbugger project files (*.3dproj)|*.3dproj";
+			ofd.InitialDirectory = PathManager.CurrDirectory;
+			ofd.RestoreDirectory = true;
+			//sfd.FileOk += new CancelEventHandler(ParticleFileValidate);
+			if (ofd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+			{
+				PathManager.CurrProjectPath = ofd.FileName;
+				PathManager.CurrDirectory = Path.GetDirectoryName(ofd.FileName);
+				LoadProject(PathManager.CurrProjectPath);
+				SyncTitle();
+			}
+		}
+
+		void LoadProject(string path)
+		{
+			//tbd
+		}
+
+		private void btnSaveProject_Click(object sender, EventArgs e)
+		{
+			SaveProject();
+		}
+
+		int GetSelectedTexture()
+		{
+			int newIndex = -1;
+			if (lvTextures.SelectedIndices.Count == 0) newIndex = -1;
+			else newIndex = lvTextures.SelectedIndices[0];
+			return newIndex;
+		}
+
+		private void lvTextures_SelectedIndexChanged(object sender, EventArgs e)
+		{
+			SyncTexInfo();
+		}
+
+		void SyncTexInfo()
+		{
+			int index = GetSelectedTexture();
+			if (index == -1)
+			{
+				vpTexLarge.SetBitmap(null);
+				grpTexInfo.Enabled = false;
+				return;
+			}
+
+			grpTexInfo.Enabled = true;
+			var tex = lvTextures.Items[index].Tag as Project.TextureReference;
+			SetSelectedTextureFormat(tex.Format);
+			txtTexInfoName.Text = tex.Name;
+			txtTexInfoDims.Text = string.Format("{0}, {1}", tex.Width, tex.Height);
+			txtTexInfoSize.Text = (tex.TexImage.DSTexData.Length).ToFileSize(2);
+			if (tex.TexImage.DSPalData.Length != 0)
+				txtTexInfoSize.Text += " + " + (tex.TexImage.DSPalData.Length * 2) + "B";
+			vpTexLarge.SetBitmap(new Bitmap(tex.TexImage.Preview));
+		}
+
+		void SetSelectedTextureFormat(TextureFormat format)
+		{
+			foreach (var rb in rbTexFormats)
+				if ((TextureFormat)rb.Tag == format)
+				{
+					rb.Checked = true;
+					break;
+				}
+		}
+
+		TextureFormat GetSelectedTextureFormat()
+		{
+			foreach (var rb in rbTexFormats)
+				if (rb.Checked) return (TextureFormat)rb.Tag;
+			return TextureFormat.Format0_None;
+		}
+
+		private void rbTexFmt_CheckedChanged(object sender, EventArgs e)
+		{
+			var tex = lvTextures.Items[GetSelectedTexture()].Tag as Project.TextureReference;
+			tex.SetFormat(GetSelectedTextureFormat());
+			SyncTexInfo();
 		}
 	}
 
