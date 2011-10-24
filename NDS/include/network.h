@@ -15,6 +15,7 @@ typedef enum
   Message_Syn,            //ds <-> pc
   Message_Ack,            //ds <-> pc
   Message_Texture,        //pc --> ds
+  Message_Register8,      //pc --> ds
   Message_Register16,     //pc --> ds
   Message_Register32,     //pc --> ds
   Message_DisplayList,    //pc --> ds
@@ -38,6 +39,11 @@ typedef struct
       void   *address;
       size_t  size;
     } tex;
+
+    struct {
+      void     *address;
+      uint8_t  value;
+    } register8;
 
     struct {
       void     *address;

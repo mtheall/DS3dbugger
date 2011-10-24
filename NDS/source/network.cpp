@@ -16,6 +16,7 @@ static u8        zscratch[1048576];
 void handleSyn(SOCKET connection, Message &msg);
 void handleAck(SOCKET connection, Message &msg);
 void handleTexture(SOCKET connection, Message &msg);
+void handleRegister8(SOCKET connection, Message &msg);
 void handleRegister16(SOCKET connection, Message &msg);
 void handleRegister32(SOCKET connection, Message &msg);
 void handleDisplayList(SOCKET connection, Message &msg);
@@ -27,6 +28,7 @@ void (*handle[])(SOCKET connection, Message &msg) =
   handleSyn,
   handleAck,
   handleTexture,
+  handleRegister8,
   handleRegister16,
   handleRegister32,
   handleDisplayList,
@@ -330,6 +332,19 @@ void handleTexture(SOCKET connection, Message &msg) {
 
   swiWaitForVBlank();
   dmaCopy(zscratch, msg.tex.address, size);
+
+  iprintf("Done receiving texture\n");
+}
+
+void handleRegister8(SOCKET connection, Message &msg) {
+  if(msg.type != Message_Register8)
+    quit("Register8: Message type mismatch\n");
+
+  iprintf("Got Register8 message\n");
+  iprintf("  Address: %08X\n", (u32)msg.register8.address);
+  iprintf("  Value:   %8d\n", msg.register8.value);
+
+  *(vu8*)msg.register8.address = msg.register8.value;
 }
 
 void handleRegister16(SOCKET connection, Message &msg) {
