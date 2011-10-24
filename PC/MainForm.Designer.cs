@@ -45,6 +45,10 @@
 			this.btnOpenProject = new System.Windows.Forms.Button();
 			this.btnSaveProject = new System.Windows.Forms.Button();
 			this.grpTexInfo = new System.Windows.Forms.GroupBox();
+			this.label8 = new System.Windows.Forms.Label();
+			this.label7 = new System.Windows.Forms.Label();
+			this.txtTexInfoPalAddr = new System.Windows.Forms.TextBox();
+			this.txtTexInfoTexAddr = new System.Windows.Forms.TextBox();
 			this.txtTexInfoSize = new System.Windows.Forms.TextBox();
 			this.label6 = new System.Windows.Forms.Label();
 			this.txtTexInfoDims = new System.Windows.Forms.TextBox();
@@ -63,6 +67,8 @@
 			this.panel2 = new System.Windows.Forms.Panel();
 			this.vpTexLarge = new RetainedViewportPanel();
 			this.lvTextures = new System.Windows.Forms.ListView();
+			this.button1 = new System.Windows.Forms.Button();
+			this.txtTotalTexSize = new System.Windows.Forms.TextBox();
 			this.panel1.SuspendLayout();
 			this.grpTexInfo.SuspendLayout();
 			this.groupBox2.SuspendLayout();
@@ -219,6 +225,10 @@
 			// 
 			// grpTexInfo
 			// 
+			this.grpTexInfo.Controls.Add(this.label8);
+			this.grpTexInfo.Controls.Add(this.label7);
+			this.grpTexInfo.Controls.Add(this.txtTexInfoPalAddr);
+			this.grpTexInfo.Controls.Add(this.txtTexInfoTexAddr);
 			this.grpTexInfo.Controls.Add(this.txtTexInfoSize);
 			this.grpTexInfo.Controls.Add(this.label6);
 			this.grpTexInfo.Controls.Add(this.txtTexInfoDims);
@@ -230,10 +240,44 @@
 			this.grpTexInfo.Controls.Add(this.panel2);
 			this.grpTexInfo.Location = new System.Drawing.Point(540, 480);
 			this.grpTexInfo.Name = "grpTexInfo";
-			this.grpTexInfo.Size = new System.Drawing.Size(281, 244);
+			this.grpTexInfo.Size = new System.Drawing.Size(281, 296);
 			this.grpTexInfo.TabIndex = 17;
 			this.grpTexInfo.TabStop = false;
 			this.grpTexInfo.Text = "Texture Info";
+			// 
+			// label8
+			// 
+			this.label8.AutoSize = true;
+			this.label8.Location = new System.Drawing.Point(5, 263);
+			this.label8.Name = "label8";
+			this.label8.Size = new System.Drawing.Size(39, 13);
+			this.label8.TabIndex = 17;
+			this.label8.Text = "PAddr:";
+			// 
+			// label7
+			// 
+			this.label7.AutoSize = true;
+			this.label7.Location = new System.Drawing.Point(11, 237);
+			this.label7.Name = "label7";
+			this.label7.Size = new System.Drawing.Size(32, 13);
+			this.label7.TabIndex = 16;
+			this.label7.Text = "Addr:";
+			// 
+			// txtTexInfoPalAddr
+			// 
+			this.txtTexInfoPalAddr.Location = new System.Drawing.Point(45, 260);
+			this.txtTexInfoPalAddr.Name = "txtTexInfoPalAddr";
+			this.txtTexInfoPalAddr.ReadOnly = true;
+			this.txtTexInfoPalAddr.Size = new System.Drawing.Size(99, 20);
+			this.txtTexInfoPalAddr.TabIndex = 15;
+			// 
+			// txtTexInfoTexAddr
+			// 
+			this.txtTexInfoTexAddr.Location = new System.Drawing.Point(44, 234);
+			this.txtTexInfoTexAddr.Name = "txtTexInfoTexAddr";
+			this.txtTexInfoTexAddr.ReadOnly = true;
+			this.txtTexInfoTexAddr.Size = new System.Drawing.Size(99, 20);
+			this.txtTexInfoTexAddr.TabIndex = 14;
 			// 
 			// txtTexInfoSize
 			// 
@@ -246,7 +290,7 @@
 			// label6
 			// 
 			this.label6.AutoSize = true;
-			this.label6.Location = new System.Drawing.Point(6, 215);
+			this.label6.Location = new System.Drawing.Point(11, 214);
 			this.label6.Name = "label6";
 			this.label6.Size = new System.Drawing.Size(30, 13);
 			this.label6.TabIndex = 11;
@@ -282,7 +326,7 @@
 			// label5
 			// 
 			this.label5.AutoSize = true;
-			this.label5.Location = new System.Drawing.Point(8, 192);
+			this.label5.Location = new System.Drawing.Point(11, 192);
 			this.label5.Name = "label5";
 			this.label5.Size = new System.Drawing.Size(33, 13);
 			this.label5.TabIndex = 7;
@@ -392,7 +436,7 @@
 			// label4
 			// 
 			this.label4.AutoSize = true;
-			this.label4.Location = new System.Drawing.Point(6, 166);
+			this.label4.Location = new System.Drawing.Point(3, 166);
 			this.label4.Name = "label4";
 			this.label4.Size = new System.Drawing.Size(38, 13);
 			this.label4.TabIndex = 5;
@@ -430,11 +474,31 @@
 			this.lvTextures.DragEnter += new System.Windows.Forms.DragEventHandler(this.lvTextures_DragEnter);
 			this.lvTextures.DragOver += new System.Windows.Forms.DragEventHandler(this.lvTextures_DragOver);
 			// 
+			// button1
+			// 
+			this.button1.Location = new System.Drawing.Point(827, 353);
+			this.button1.Name = "button1";
+			this.button1.Size = new System.Drawing.Size(75, 23);
+			this.button1.TabIndex = 18;
+			this.button1.Text = "button1";
+			this.button1.UseVisualStyleBackColor = true;
+			this.button1.Click += new System.EventHandler(this.button1_Click);
+			// 
+			// txtTotalTexSize
+			// 
+			this.txtTotalTexSize.Location = new System.Drawing.Point(68, 459);
+			this.txtTotalTexSize.Name = "txtTotalTexSize";
+			this.txtTotalTexSize.ReadOnly = true;
+			this.txtTotalTexSize.Size = new System.Drawing.Size(216, 20);
+			this.txtTotalTexSize.TabIndex = 19;
+			// 
 			// MainForm
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(914, 788);
+			this.ClientSize = new System.Drawing.Size(914, 804);
+			this.Controls.Add(this.txtTotalTexSize);
+			this.Controls.Add(this.button1);
 			this.Controls.Add(this.grpTexInfo);
 			this.Controls.Add(this.btnSaveProject);
 			this.Controls.Add(this.btnOpenProject);
@@ -502,5 +566,11 @@
 		private System.Windows.Forms.TextBox txtTexInfoName;
 		private System.Windows.Forms.TextBox txtTexInfoSize;
 		private System.Windows.Forms.Label label6;
+		private System.Windows.Forms.Label label8;
+		private System.Windows.Forms.Label label7;
+		private System.Windows.Forms.TextBox txtTexInfoPalAddr;
+		private System.Windows.Forms.TextBox txtTexInfoTexAddr;
+		private System.Windows.Forms.Button button1;
+		private System.Windows.Forms.TextBox txtTotalTexSize;
 	}
 }

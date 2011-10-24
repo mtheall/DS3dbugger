@@ -36,7 +36,17 @@ namespace DS3dbugger
 			public Bitmap Preview;
 
 			public byte[] DSTexData = new byte[0];
-			public short[] DSPalData = new short[0];
+			public byte[] DSPalData = new byte[0];
+			
+			/// <summary>
+			/// user-facing address values
+			/// </summary>
+			public int DSTexAddress, DSPalAddress;
+
+			/// <summary>
+			/// addresses formatted for use in teximage and texpltt regs
+			/// </summary>
+			public int DSTexBase, DSPalBase;
 
 			public void ConvertFormat(TextureFormat format)
 			{
@@ -58,7 +68,7 @@ namespace DS3dbugger
 				Preview = Util.BitmapFromCorImage(ConvImage);
 
 				//grab the DS bytes
-				DSPalData = new short[0];
+				DSPalData = new byte[0];
 
 				switch (format)
 				{
@@ -95,8 +105,7 @@ namespace DS3dbugger
 					g >>= 3;
 					b >>= 3;
 					int c = r | (g << 5) | (b << 10) | 0x8000;
-					DSTexData[i * 2 + 0] = (byte)(c & 0xFF);
-					DSTexData[i * 2 + 0] = (byte)((c >> 8) & 0xFF);
+					WriteColor(DSTexData, i * 2, c);
 				}
 			}
 
@@ -146,9 +155,15 @@ namespace DS3dbugger
 				DSTexData = ConvImage.GrabPixels();
 			}
 
+			void WriteColor(byte[] buf, int ofs, int val)
+			{
+				buf[ofs + 0] = (byte)(val & 0xFF);
+				buf[ofs + 1] = (byte)((val >> 8) & 0xFF);
+			}
+
 			void Grab_Palette(int colors)
 			{
-				DSPalData = new short[colors * 2];
+				DSPalData = new byte[colors * 2];
 				byte[] palette = ConvImage.GrabPalette();
 				for (int i = 0; i < colors; i++)
 				{
@@ -159,7 +174,7 @@ namespace DS3dbugger
 					g >>= 3;
 					b >>= 3;
 					int c = r | (g << 5) | (b << 10) | 0x8000;
-					DSPalData[i] = (short)c;
+					WriteColor(DSPalData, i * 2, c);
 				}
 			}
 
@@ -224,9 +239,14 @@ namespace DS3dbugger
 				//TODO - try to autodetect a format (corona may need to manage palette size a little better)
 				SetFormat(TextureFormat.Format4_I8);
 			}
-		}
+		} //class TextureReference
 
 		public List<TextureReference> TextureReferences = new List<TextureReference>();
+
+		public Project()
+		{
+			LayoutMemory();
+		}
 
 		public void LoadFrom(string path)
 		{
@@ -236,7 +256,7 @@ namespace DS3dbugger
 		public void DefineTexture(string path)
 		{
 			//make sure its not already in there
-			int index = TextureReferences.FindIndex((x) => x.Path.ToUpper() == x.Path);
+			int index = TextureReferences.FindIndex((x) => x.Path.ToUpper() == path.ToUpper());
 			if (index != -1) return;
 
 			var pathFull = PathManager.FullyQualify(path);
@@ -251,7 +271,70 @@ namespace DS3dbugger
 			tr.SetFormat(TextureFormat.Format4_I8);
 
 			TextureReferences.Add(tr);
+
+			LayoutMemory();
 		}
 
-	}
+		/// <summary>
+		/// Allocates areas in vram for all textures and palettes
+		/// </summary>
+		public void LayoutMemory()
+		{
+			int tex_cursor = 0;
+			int pal_cursor = 0;
+			foreach (var tr in TextureReferences)
+			{
+				tex_cursor = ((tex_cursor + 7) / 8) * 8;
+				tr.TexImage.DSTexAddress = tex_cursor;
+				tr.TexImage.DSTexBase = tr.TexImage.DSTexAddress / 8;
+				tex_cursor += tr.TexImage.DSTexData.Length;
+
+				tr.TexImage.DSPalAddress = -1;
+				if (tr.TexImage.DSTexData.Length != 0)
+				{
+					if (tr.Format == TextureFormat.Format2_I2) { }
+					else pal_cursor = ((pal_cursor + 15) / 16)*16;
+					tr.TexImage.DSPalAddress = pal_cursor;
+					if (tr.Format == TextureFormat.Format2_I2)
+						tr.TexImage.DSPalBase = pal_cursor / 8;
+					else tr.TexImage.DSPalBase = pal_cursor / 16;
+					pal_cursor += tr.TexImage.DSPalData.Length;
+				}
+			}
+
+			CompileMemory();
+		}
+
+		public MemoryBuffers Buffers, BuffersCompressed;
+
+		/// <summary>
+		/// compiles the textures and palette for transferring to the nds
+		/// </summary>
+		void CompileMemory()
+		{
+			var msTex = new MemoryStream();
+			var msPal = new MemoryStream();
+
+			foreach (var tr in TextureReferences)
+			{
+				msTex.Position = tr.TexImage.DSTexAddress;
+				msTex.Write(tr.TexImage.DSTexData, 0, tr.TexImage.DSTexData.Length);
+					
+				if (tr.TexImage.DSPalAddress != -1)
+				{
+					msPal.Position = tr.TexImage.DSPalAddress;
+					msPal.Write(tr.TexImage.DSPalData, 0, tr.TexImage.DSPalData.Length);
+				}
+			}
+
+			Buffers = new MemoryBuffers { Texture = msTex.ToArray(), Palette = msPal.ToArray() };
+			BuffersCompressed = new MemoryBuffers { Texture = Util.Compress(Buffers.Texture), Palette = Util.Compress(Buffers.Palette) };
+		}
+
+		public class MemoryBuffers
+		{
+			public byte[] Texture, Palette;
+		}
+
+	} //class project
 }

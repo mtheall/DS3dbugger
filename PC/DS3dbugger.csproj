@@ -70,6 +70,7 @@
     <Compile Include="MainForm.Designer.cs">
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="NDS.cs" />
     <Compile Include="PathManager.cs" />
     <Compile Include="Project.cs" />
     <Compile Include="Protocol.cs" />

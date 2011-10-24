@@ -54,6 +54,7 @@ namespace DS3dbugger
 
 			PathManager.CurrProjectPath = Path.Combine(PathManager.CurrDirectory, "untitled.3dproj");
 			SyncTitle();
+			SyncTextures();
 		}
 
 		void SetViewport(Bitmap bmp)
@@ -76,8 +77,8 @@ namespace DS3dbugger
 		}
 
 		uint[] testData = new uint[] {
-			68,         // Length
-		0x15101210,
+		99999,         // Length
+			0x15101210,
 			0x00000002, // MTX_MODE Position & Vector Simultaneous Set mode
 			0x00000000, // MTX_POP 0
 			0x00000002, // MTX_MODE Position & Vector Simultaneous Set mode
@@ -137,22 +138,46 @@ namespace DS3dbugger
 			0x00000000, //        Z =  0.0
 			0xF0001000, // VTX_16 X = -1.0, Y =  1.0
 			0x00000000, //        Z =  0.0
-		0x40201C41,
+		0x00201C41,
 						// END_VTXS
 			0x00003000, // MTX_TRANS X = 3.0
 			0x00000000, //           Y = 0.0
 			0x00000000, //           Z = 0.0
-			0x000003E0, // COLOR RGB15(0, 31, 0)
+			0x0000FFFF, // COLOR (white, for modulating with texture)
+
+		0x0000002A,
+			(uint)((7<<26)|(4<<23)|(4<<20)), //teximage param (direct color, 128, 128)
+
+		0x00000040,
 			0x00000001, // BEGIN_VTXS Quads
-		0x23232323,
+		
+		0x00000022, //texcoord
+					(uint)((0<<16)|0),
+			
+		0x00000023,
 			0x1000F000, // VTX_16 X =  1.0, Y = -1.0
 			0x00000000, //        Z =  0.0
+
+		0x00000022, //texcoord
+		(uint)((0<<16)|2048),
+			
+		0x00000023,
 			0x10001000, // VTX_16 X =  1.0, Y =  1.0
 			0x00000000, //        Z =  0.0
+
+		0x00000022, //texcoord
+		(uint)((2048<<16)|2048),
+			
+		0x00000023,
 			0xF0001000, // VTX_16 X = -1.0, Y =  1.0
 			0x00000000, //        Z =  0.0
+
+		0x00000022, //texcoord
+		(uint)((2048<<16)|0),
+		0x00000023,
 			0xF000F000, // VTX_16 X = -1.0, Y = -1.0
 			0x00000000, //        Z =  0.0
+
 		0x00501241,
 						// END_VTXS
 			0x00000001, // MTX_POP 1
@@ -207,6 +232,7 @@ namespace DS3dbugger
 
 		TcpClient tcpc;
 		NetworkStream ns;
+		NDS nds;
 		private void btnConnect_Click(object sender, EventArgs e)
 		{
 			tcpc = new TcpClient(txtHost.Text, 9393);
@@ -223,6 +249,10 @@ namespace DS3dbugger
 			btnConnect.Text = "connected";
 			txtHost.ReadOnly = true;
 
+			nds = new NDS(ns);
+			nds.BasicTextured3DCnt();
+
+			testData[0] = (uint)(testData.Length);
 			byte[] toSend = Util.Compress(testData.Select(x => BitConverter.GetBytes(x)).SelectMany(x => x).ToArray());
 
 			msg.type = MessageType.Message_DisplayList;
@@ -306,6 +336,8 @@ namespace DS3dbugger
 				lvTextures.LargeImageList.Images.Add(tex.Bmp);
 				lvTextures.Items.Add(lvi);
 			}
+
+			SyncTexTotalInfo();
 		}
 
 		private void lvTextures_DragEnter(object sender, DragEventArgs e)
@@ -401,10 +433,27 @@ namespace DS3dbugger
 			SetSelectedTextureFormat(tex.Format);
 			txtTexInfoName.Text = tex.Name;
 			txtTexInfoDims.Text = string.Format("{0}, {1}", tex.Width, tex.Height);
+			
 			txtTexInfoSize.Text = (tex.TexImage.DSTexData.Length).ToFileSize(2);
 			if (tex.TexImage.DSPalData.Length != 0)
 				txtTexInfoSize.Text += " + " + (tex.TexImage.DSPalData.Length * 2) + "B";
+			
+			txtTexInfoTexAddr.Text = string.Format("0x{0:X6}", tex.TexImage.DSTexAddress);
+			if (tex.TexImage.DSPalAddress == -1)
+				txtTexInfoPalAddr.Text = "n/a";
+			else txtTexInfoPalAddr.Text = string.Format("0x{0:X6}", tex.TexImage.DSPalAddress);
+
 			vpTexLarge.SetBitmap(new Bitmap(tex.TexImage.Preview));
+
+			SyncTexTotalInfo();
+		}
+
+		void SyncTexTotalInfo()
+		{
+			txtTotalTexSize.Text = string.Format("{0} total data ({1} compressed)",
+				(CurrProject.Buffers.Palette.Length + CurrProject.Buffers.Texture.Length).ToFileSize(2),
+				(CurrProject.BuffersCompressed.Palette.Length + CurrProject.BuffersCompressed.Texture.Length).ToFileSize(2)
+				);
 		}
 
 		void SetSelectedTextureFormat(TextureFormat format)
@@ -428,7 +477,33 @@ namespace DS3dbugger
 		{
 			var tex = lvTextures.Items[GetSelectedTexture()].Tag as Project.TextureReference;
 			tex.SetFormat(GetSelectedTextureFormat());
+			CurrProject.LayoutMemory();
 			SyncTexInfo();
+		}
+
+		private void button1_Click(object sender, EventArgs e)
+		{
+			Message msg = new Message();
+			msg.type = MessageType.Message_Texture;
+
+			nds.MapLCDC();
+
+			byte[] buf = CurrProject.BuffersCompressed.Texture;
+			msg.tex_addr = 0x06800000; //vram_a
+			msg.tex_size = (uint)buf.Length;
+			msg.Send(ns);
+			ns.Write(buf, 0, buf.Length);
+
+			if (CurrProject.Buffers.Palette.Length != 0)
+			{
+				buf = CurrProject.BuffersCompressed.Palette;
+				msg.tex_addr = 0x06880000; //vram_e
+				msg.tex_size = (uint)buf.Length;
+				msg.Send(ns);
+				ns.Write(buf, 0, buf.Length);
+			}
+
+			nds.MapNormal();
 		}
 	}
 
