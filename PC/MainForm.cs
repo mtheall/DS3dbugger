@@ -375,7 +375,7 @@ namespace DS3dbugger
 
 		void SaveProject()
 		{
-			File.WriteAllText(PathManager.CurrProjectPath, "");
+			File.WriteAllText(PathManager.CurrProjectPath, CurrProject.SaveToString());
 		}
 
 		private void btnOpenProject_Click(object sender, EventArgs e)
@@ -397,7 +397,9 @@ namespace DS3dbugger
 
 		void LoadProject(string path)
 		{
-			//tbd
+			CurrProject = new Project();
+			CurrProject.LoadFromString(File.ReadAllText(path));
+			SyncTextures();
 		}
 
 		private void btnSaveProject_Click(object sender, EventArgs e)

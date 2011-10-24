@@ -1,8 +1,11 @@
 using System;
+using System.Text;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+
+using Newtonsoft.Json.Linq;
 
 namespace DS3dbugger
 {
@@ -334,6 +337,34 @@ namespace DS3dbugger
 		public class MemoryBuffers
 		{
 			public byte[] Texture, Palette;
+		}
+
+		public string SaveToString()
+		{
+			JObject jo = new JObject();
+			JArray jotra = new JArray();
+			jo["version"] = 1;
+			jo["textures"] = jotra;
+
+			foreach (var tr in TextureReferences)
+			{
+				JObject tro = new JObject();
+				tro["path"] = tr.Path;
+				jotra.Add(tro);
+			}
+
+			return jo.ToString();
+		}
+
+		public void LoadFromString(string str)
+		{
+			JObject jo = JObject.Parse(str);
+			if ((int)jo["version"] != 1) return;
+			foreach (var jotr in jo["textures"])
+			{
+				DefineTexture((string)jotr["path"]);
+			}
+			
 		}
 
 	} //class project

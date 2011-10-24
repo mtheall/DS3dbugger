@@ -16,7 +16,7 @@ using Newtonsoft.Json;
 					using (var reader = file.OpenText())
 					{
 						var s = new JsonSerializer();
-						var r = new JsonReader(reader);
+						var r = new JsonTextReader(reader);
 						config = (T)s.Deserialize(r, typeof(T));
 					}
 			}
@@ -31,7 +31,7 @@ using Newtonsoft.Json;
 			using (var writer = file.CreateText())
 			{
 				var s = new JsonSerializer();
-				var w = new JsonWriter(writer) { Formatting = Formatting.Indented };
+				var w = new JsonTextWriter(writer) { Formatting = Formatting.Indented };
 				s.Serialize(w, config);
 			}
 		}
