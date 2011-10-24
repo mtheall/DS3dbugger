@@ -205,12 +205,17 @@ namespace DS3dbugger
 		{
 			public string Path;
 			public string Name;
-			public TextureFormat Format = TextureFormat.Format0_None;
+			public TextureFormat Format { get; private set; }
 
 			public int Width { get { return TexImage.Width; } }
 			public int Height { get { return TexImage.Height; } }
 
 			public TexImage TexImage;
+
+			public TextureReference()
+			{
+				Format = TextureFormat.Format0_None;
+			}
 
 			public void Dispose()
 			{
@@ -256,11 +261,11 @@ namespace DS3dbugger
 			//todo
 		}
 
-		public void DefineTexture(string path)
+		public TextureReference DefineTexture(string path)
 		{
 			//make sure its not already in there
 			int index = TextureReferences.FindIndex((x) => x.Path.ToUpper() == path.ToUpper());
-			if (index != -1) return;
+			if (index != -1) return TextureReferences[index];
 
 			var pathFull = PathManager.FullyQualify(path);
 
@@ -276,6 +281,8 @@ namespace DS3dbugger
 			TextureReferences.Add(tr);
 
 			LayoutMemory();
+
+			return tr;
 		}
 
 		/// <summary>
@@ -348,9 +355,10 @@ namespace DS3dbugger
 
 			foreach (var tr in TextureReferences)
 			{
-				JObject tro = new JObject();
-				tro["path"] = tr.Path;
-				jotra.Add(tro);
+				var jotr = new JObject();
+				jotr["path"] = tr.Path;
+				jotr["format"] = (int)tr.Format;
+				jotra.Add(jotr);
 			}
 
 			return jo.ToString();
@@ -362,7 +370,8 @@ namespace DS3dbugger
 			if ((int)jo["version"] != 1) return;
 			foreach (var jotr in jo["textures"])
 			{
-				DefineTexture((string)jotr["path"]);
+				TextureReference tr = DefineTexture((string)jotr["path"]);
+				tr.SetFormat((TextureFormat)(int)jotr["format"]);
 			}
 			
 		}

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "textures": [
+    {
+      "path": "textures/16bpp.png",
+      "format": 7
+    }
+  ]
+}

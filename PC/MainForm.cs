@@ -252,6 +252,14 @@ namespace DS3dbugger
 			nds = new NDS(ns);
 			nds.BasicTextured3DCnt();
 
+			SendTestList();
+			AcquireScreen();
+		}
+
+		void SendTestList()
+		{
+			Message msg = new Message(); 
+			
 			testData[0] = (uint)(testData.Length);
 			byte[] toSend = Util.Compress(testData.Select(x => BitConverter.GetBytes(x)).SelectMany(x => x).ToArray());
 
@@ -261,8 +269,6 @@ namespace DS3dbugger
 
 			ns.Write(toSend, 0, toSend.Length);
 			ns.Flush();
-
-			AcquireScreen();
 		}
 
 		private void btnAcquireScreen_Click(object sender, EventArgs e)
@@ -320,6 +326,7 @@ namespace DS3dbugger
 				CurrProject.DefineTexture(relative);
 			}
 			SyncTextures();
+			ProjectChanged();
 		}
 
 		void SyncTextures()
@@ -400,6 +407,12 @@ namespace DS3dbugger
 			CurrProject = new Project();
 			CurrProject.LoadFromString(File.ReadAllText(path));
 			SyncTextures();
+			ProjectChanged();
+		}
+
+		void ProjectChanged()
+		{
+			CurrProject.LayoutMemory();
 		}
 
 		private void btnSaveProject_Click(object sender, EventArgs e)
@@ -479,7 +492,7 @@ namespace DS3dbugger
 		{
 			var tex = lvTextures.Items[GetSelectedTexture()].Tag as Project.TextureReference;
 			tex.SetFormat(GetSelectedTextureFormat());
-			CurrProject.LayoutMemory();
+			ProjectChanged();
 			SyncTexInfo();
 		}
 
@@ -506,6 +519,14 @@ namespace DS3dbugger
 			}
 
 			nds.MapNormal();
+			
+			AcquireScreen();
+		}
+
+		private void button2_Click(object sender, EventArgs e)
+		{
+			SendTestList();
+			AcquireScreen();
 		}
 	}
 
