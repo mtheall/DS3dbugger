@@ -12,6 +12,7 @@ namespace DS3dbugger
 		Message_Syn,            //ds <-> pc
 		Message_Ack,            //ds <-> pc
 		Message_Texture,        //pc --> ds
+		Message_Register8,     //pc --> ds
 		Message_Register16,     //pc --> ds
 		Message_Register32,     //pc --> ds
 		Message_DisplayList,    //pc --> ds
@@ -34,6 +35,12 @@ namespace DS3dbugger
 		public uint tex_addr;
 		[FieldOffset(8)]
 		public uint tex_size;
+
+
+		[FieldOffset(4)]
+		public uint register8_address;
+		[FieldOffset(8)]
+		public byte register8_value;
 
 		[FieldOffset(4)]
 		public uint register16_address;
